@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Alphabet Sound Game</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mali:wght@400;600;700&family=Nunito:wght@700;900&display=swap');
+
+        body {
+            font-family: 'Mali', 'Nunito', sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            touch-action: none; /* Prevent pinch zoom on touch screens */
+        }
+
+        /* Glassmorphism Classes */
+        .glass {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(10px);
+            border-top: 4px solid rgba(255, 255, 255, 0.9);
+            border-left: 4px solid rgba(255, 255, 255, 0.9);
+            border-bottom: 4px solid rgba(0, 0, 0, 0.1);
+            border-right: 4px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 8px 12px 20px rgba(0,0,0,0.12);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .glass-card:hover, .glass-card.ar-hover {
+            transform: translateY(-8px) scale(1.04);
+            box-shadow: 12px 16px 28px rgba(0,0,0,0.18);
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .glass-button {
+            background: linear-gradient(145deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+            border: 3px solid white;
+            box-shadow: 0 10px 20px rgba(255, 154, 158, 0.4), inset 0 -4px 0 rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .glass-button:hover, .glass-button.ar-hover {
+            transform: scale(1.05) translateY(-5px);
+            filter: brightness(1.1);
+        }
+
+        .glass-button:active, .glass-button.ar-active {
+            transform: scale(0.95) translateY(2px);
+            box-shadow: 0 2px 10px rgba(255, 154, 158, 0.4), inset 0 4px 0 rgba(0,0,0,0.1);
+        }
+
+        /* Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.1); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-bounce-in { animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(74, 222, 128, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+        .animate-pulse-glow { animation: pulse-glow 2s infinite; }
+
+        /* Nuke Explosion Effects (ระเบิดนิวเคลียร์อลังการ) */
+        @keyframes nuke-flash {
+            0% { opacity: 1; background-color: rgba(255, 255, 255, 1); }
+            30% { opacity: 1; background-color: rgba(255, 235, 59, 0.9); }
+            100% { opacity: 0; background-color: rgba(255, 87, 34, 0); }
+        }
+        @keyframes nuke-fireball {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            20% { transform: translate(-50%, -50%) scale(10); opacity: 1; filter: brightness(2); }
+            50% { transform: translate(-50%, -50%) scale(25); opacity: 0.9; }
+            85% { transform: translate(-50%, -50%) scale(45); opacity: 0.6; filter: brightness(0.8); }
+            100% { transform: translate(-50%, -50%) scale(60); opacity: 0; }
+        }
+        .nuke-overlay {
+            position: fixed; inset: 0; z-index: 999; pointer-events: none; opacity: 0;
+        }
+        .nuke-fireball-element {
+            position: fixed; top: 50%; left: 50%; width: 10vw; height: 10vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ffffff 0%, #ffff00 30%, #ff5722 60%, transparent 100%);
+            z-index: 998; pointer-events: none; opacity: 0;
+        }
+
+        /* Confetti */
+        .confetti {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: #f00;
+            opacity: 0;
+        }
+
+        /* Hide webcam element, show via canvas */
+        .video-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror */
+            z-index: 1;
+            opacity: 0.8; /* Make it slightly faded so UI pops */
+        }
+
+        /* Canvas must be on top but allow clicks to pass through */
+        #ar-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 50;
+            pointer-events: none; /* Crucial: lets physical mouse clicks hit UI beneath */
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 20;
+        }
+        
+        .english-font { font-family: 'Nunito', sans-serif; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Video Background (Hidden physically, drawn on canvas or used as background) -->
+    <video id="webcam" class="video-background" autoplay playsinline></video>
+
+    <!-- UI Layer -->
+    <div id="ui-layer" class="flex flex-col items-center justify-center p-4">
+        
+        <!-- Status indicator (Camera / Hand) -->
+        <div id="hand-status" class="absolute top-4 left-4 glass px-4 py-2 rounded-full font-bold text-sm text-pink-600 flex items-center gap-2 transition-opacity duration-300">
+            <span class="animate-pulse">⏳</span> กำลังเตรียมกล้อง...
+        </div>
+
+        <!-- ================== SPLASH SCREEN ================== -->
+        <div id="screen-splash" class="absolute inset-0 flex flex-col items-center justify-center z-30 transition-opacity duration-500 bg-white/40 backdrop-blur-md">
+            <div class="glass rounded-3xl p-10 text-center max-w-3xl animate-bounce-in w-11/12 max-h-screen overflow-y-auto">
+                <h1 class="text-5xl md:text-7xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 english-font drop-shadow-lg">
+                    AR Alphabet Sound Game
+                </h1>
+                <p class="text-2xl md:text-3xl font-semibold mb-8 text-gray-700">Listen and choose the correct letter</p>
+                <div class="flex justify-center space-x-6 mb-10 text-6xl">
+                    <span class="animate-float" style="animation-delay: 0s;">🍎</span>
+                    <span class="animate-float" style="animation-delay: 0.2s;">⚽</span>
+                    <span class="animate-float" style="animation-delay: 0.4s;">🐱</span>
+                </div>
+                <!-- ar-clickable class makes it interactable with AR pinch -->
+                <button onclick="goToInstruction()" class="ar-clickable glass-button text-3xl md:text-5xl font-bold py-6 px-12 rounded-full text-white cursor-pointer w-full md:w-auto">
+                    เข้าสู่เกม (Start)
+                </button>
+            </div>
+        </div>
+
+        <!-- ================== INSTRUCTION SCREEN ================== -->
+        <div id="screen-instruction" class="absolute inset-0 flex flex-col items-center justify-center z-30 hidden opacity-0 transition-opacity duration-500 bg-white/40 backdrop-blur-md">
+            <div class="glass rounded-3xl p-8 md:p-12 text-center max-w-2xl animate-bounce-in w-11/12">
+                <h2 class="text-5xl md:text-6xl font-black mb-8 text-blue-600">วิธีเล่น</h2>
+                
+                <div class="space-y-6 text-left mb-10 mx-auto max-w-md">
+                    <div class="flex items-center glass p-4 rounded-2xl">
+                        <div class="text-5xl mr-4">🔊</div>
+                        <p class="text-2xl md:text-3xl font-semibold">1. ฟังเสียงตัวอักษร</p>
+                    </div>
+                    <div class="flex items-center glass p-4 rounded-2xl">
+                        <div class="text-5xl mr-4">👆</div>
+                        <p class="text-2xl md:text-3xl font-semibold">2. ใช้มือหรือเมาส์เลือกคำตอบ</p>
+                    </div>
+                    <div class="flex items-center glass p-4 rounded-2xl">
+                        <div class="text-5xl mr-4">✨</div>
+                        <p class="text-2xl md:text-3xl font-semibold">3. เลือกตัวอักษรที่ตรงกับเสียง</p>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="ar-clickable bg-green-400 hover:bg-green-500 border-4 border-white text-white font-black text-4xl md:text-5xl py-6 px-12 rounded-full shadow-[0_10px_20px_rgba(74,222,128,0.5)] transition transform hover:scale-110 active:scale-95 animate-pulse-glow cursor-pointer">
+                    เริ่มเกม!
+                </button>
+            </div>
+        </div>
+
+        <!-- ================== GAME SCREEN ================== -->
+        <div id="screen-game" class="absolute inset-0 flex flex-col z-30 hidden opacity-0 transition-opacity duration-500 pointer-events-none">
+            
+            <!-- Top Bar -->
+            <div class="flex justify-between items-start p-4 md:p-8 w-full pointer-events-auto">
+                <div class="glass px-6 py-3 rounded-2xl text-xl md:text-3xl font-bold text-blue-700">
+                    ด่าน: <span id="level-display">1</span>/15
+                </div>
+                
+                <div class="glass px-6 py-3 rounded-2xl text-xl md:text-3xl font-bold text-green-600 flex flex-col items-end">
+                    <span>คะแนน</span>
+                    <span id="score-display" class="text-3xl md:text-5xl english-font">0</span>
+                </div>
+            </div>
+
+            <!-- Center Game Area -->
+            <div class="flex-grow flex flex-col items-center justify-center p-4 pointer-events-none relative animate-fade-in">
+                
+                <!-- Feedback Message -->
+                <div id="feedback-msg" class="absolute top-1/4 text-6xl md:text-8xl font-black text-center opacity-0 transition-all duration-300 pointer-events-none z-40 drop-shadow-[0_5px_5px_rgba(255,255,255,1)]">
+                    Correct! 🎉
+                </div>
+
+                <!-- Instruction & Replay -->
+                <div id="instruction-container" class="glass px-8 py-4 rounded-3xl mb-6 flex flex-col items-center pointer-events-auto shadow-xl bg-white/70 transition-all duration-500">
+                    <p class="text-xl md:text-3xl font-bold text-gray-700 mb-3 text-center">ฟังเสียง แล้วเลือกตัวอักษรที่ถูกต้อง</p>
+                    <button onclick="replaySound()" class="ar-clickable bg-yellow-300 hover:bg-yellow-400 border-4 border-white text-gray-800 font-bold text-xl md:text-2xl py-2 px-6 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 flex items-center gap-3 cursor-pointer">
+                        <span>🔊</span> Listen Again
+                    </button>
+                </div>
+
+                <!-- Answer Cards Container -->
+                <div id="cards-container" class="grid grid-cols-3 gap-3 md:gap-6 w-full max-w-3xl pointer-events-auto px-4 justify-center transition-all duration-500">
+                    <!-- Cards injected via JS -->
+                </div>
+
+                <!-- Next Button (ปุ่มด่านถัดไป - ย้ายมาแสดงตรงกลางหน้าจอ) -->
+                <button id="next-btn" onclick="goToNextLevel()" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ar-clickable bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 border-4 border-white text-white font-black text-3xl md:text-5xl py-6 px-12 rounded-full shadow-[0_15px_30px_rgba(59,130,246,0.6)] transition-all hover:scale-110 active:scale-95 animate-bounce z-50 cursor-pointer pointer-events-auto w-auto whitespace-nowrap">
+                    ด่านถัดไป ➔
+                </button>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="w-full h-4 bg-white/50 absolute bottom-0 pointer-events-none">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-green-400 to-blue-500 w-0 transition-all duration-500"></div>
+            </div>
+        </div>
+
+        <!-- ================== END SCREEN ================== -->
+        <div id="screen-end" class="absolute inset-0 flex flex-col items-center justify-center z-40 hidden opacity-0 transition-opacity duration-500 bg-white/60 backdrop-blur-xl">
+            <div class="glass rounded-3xl p-12 text-center max-w-2xl animate-bounce-in">
+                <h1 class="text-6xl md:text-8xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 english-font drop-shadow-md">
+                    All Clear!
+                </h1>
+                <h2 class="text-4xl md:text-5xl font-bold mb-8 text-pink-500">Congratulations! 🎉</h2>
+                
+                <div class="bg-white/80 rounded-3xl p-8 mb-10 shadow-inner">
+                    <p class="text-3xl text-gray-600 mb-2">Total Score</p>
+                    <p id="final-score" class="text-7xl md:text-9xl font-black text-blue-600 english-font">1500</p>
+                </div>
+
+                <button onclick="resetGame()" class="ar-clickable bg-gradient-to-r from-blue-400 to-purple-500 hover:from-blue-500 hover:to-purple-600 border-4 border-white text-white font-black text-3xl md:text-5xl py-5 px-10 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.2)] transition transform hover:scale-110 active:scale-95 cursor-pointer">
+                    🔄 Play Again
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Canvas for AR Overlay -->
+    <canvas id="ar-canvas"></canvas>
+
+<script>
+/* ==========================================================================
+   MASTER ALPHABET POOL (A-Z COMPLETE DATA)
+   ========================================================================== */
+const masterAlphabetPool = [
+    { letter: 'A', word: 'Apple', emoji: '🍎' },
+    { letter: 'B', word: 'Ball', emoji: '⚽' },
+    { letter: 'C', word: 'Cat', emoji: '🐱' },
+    { letter: 'D', word: 'Dog', emoji: '🐶' },
+    { letter: 'E', word: 'Egg', emoji: '🥚' },
+    { letter: 'F', word: 'Fish', emoji: '🐟' },
+    { letter: 'G', word: 'Goat', emoji: '🐐' },
+    { letter: 'H', word: 'Hat', emoji: '🎩' },
+    { letter: 'I', word: 'Ice cream', emoji: '🍦' },
+    { letter: 'J', word: 'Juice', emoji: '🧃' },
+    { letter: 'K', word: 'Kite', emoji: '🪁' },
+    { letter: 'L', word: 'Lion', emoji: '🦁' },
+    { letter: 'M', word: 'Monkey', emoji: '🐵' },
+    { letter: 'N', word: 'Nest', emoji: '🪺' },
+    { letter: 'O', word: 'Orange', emoji: '🍊' },
+    { letter: 'P', word: 'Penguin', emoji: '🐧' },
+    { letter: 'Q', word: 'Queen', emoji: '👑' },
+    { letter: 'R', word: 'Rabbit', emoji: '🐰' },
+    { letter: 'S', word: 'Sun', emoji: '☀️' },
+    { letter: 'T', word: 'Tiger', emoji: '🐯' },
+    { letter: 'U', word: 'Umbrella', emoji: '☂️' },
+    { letter: 'V', word: 'Van', emoji: '🚐' },
+    { letter: 'W', word: 'Watermelon', emoji: '🍉' },
+    { letter: 'X', word: 'Xylophone', emoji: '🪘' },
+    { letter: 'Y', word: 'Yo-yo', emoji: '🪀' },
+    { letter: 'Z', word: 'Zebra', emoji: '🦓' }
+];
+
+/* ==========================================================================
+   STATE & CONSTANTS
+   ========================================================================== */
+let activeLevels = []; // Will store the 15 randomly selected levels for the current game
+let gameState = {
+    currentScreen: 'splash', // splash, instruction, game, end
+    currentLevel: 0,
+    score: 0,
+    isPlaying: false,
+    waitingForNext: false
+};
+
+const MAX_SCORE = 1500;
+const PINCH_THRESHOLD = 0.05; // Distance threshold for pinching
+let synth = window.speechSynthesis;
+
+// DOM Elements
+const screens = {
+    splash: document.getElementById('screen-splash'),
+    instruction: document.getElementById('screen-instruction'),
+    game: document.getElementById('screen-game'),
+    end: document.getElementById('screen-end')
+};
+const cardsContainer = document.getElementById('cards-container');
+const levelDisplay = document.getElementById('level-display');
+const scoreDisplay = document.getElementById('score-display');
+const feedbackMsg = document.getElementById('feedback-msg');
+const progressBar = document.getElementById('progress-bar');
+const statusDisplay = document.getElementById('hand-status');
+
+/* ==========================================================================
+   SPEECH SYNTHESIS
+   ========================================================================== */
+function speakText(text) {
+    if (!synth) return;
+    synth.cancel(); // Stop current speech
+    
+    // Convert to lower case so the Speech Synthesis directly says the letter instead of "Capital A"
+    const utterance = new SpeechSynthesisUtterance(text.toLowerCase());
+    utterance.lang = 'en-US';
+    utterance.rate = 0.8; // Slow speed for kids
+    utterance.pitch = 1.2; // Slightly higher pitch for cute feel
+    
+    synth.speak(utterance);
+}
+
+function replaySound() {
+    if (gameState.currentScreen === 'game' && !gameState.waitingForNext) {
+        speakText(activeLevels[gameState.currentLevel].sound);
+    }
+}
+
+/* ==========================================================================
+   GAME LOGIC & UI
+   ========================================================================== */
+function switchScreen(screenName) {
+    // Hide all
+    Object.values(screens).forEach(screen => {
+        screen.classList.add('opacity-0');
+        setTimeout(() => screen.classList.add('hidden'), 500);
+    });
+
+    // Show target
+    setTimeout(() => {
+        screens[screenName].classList.remove('hidden');
+        requestAnimationFrame(() => {
+            screens[screenName].classList.remove('opacity-0');
+        });
+    }, 500);
+    
+    gameState.currentScreen = screenName;
+}
+
+function goToInstruction() {
+    speakText(""); // Unlock TTS on browser interaction
+    switchScreen('instruction');
+}
+
+// Shuffle array utility
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Generate the 15 levels session dynamically from the master pool (A-Z)
+function generateGameLevels() {
+    // 1. Shuffle all 26 letters
+    let shuffledPool = shuffleArray([...masterAlphabetPool]);
+    
+    // 2. Select first 15 letters
+    let selectedLetters = shuffledPool.slice(0, 15);
+    
+    // 3. Build level objects with randomized choices
+    activeLevels = selectedLetters.map(item => {
+        // Find candidate wrong letters from master pool
+        let wrongCandidates = masterAlphabetPool.filter(p => p.letter !== item.letter);
+        let shuffledWrong = shuffleArray([...wrongCandidates]);
+        
+        // Take 2 unique incorrect letters and combine with correct one
+        let choices = [item.letter, shuffledWrong[0].letter, shuffledWrong[1].letter];
+        
+        return {
+            sound: item.letter,
+            correct: item.letter,
+            choices: choices, // This will be shuffled again visually in loadLevel()
+            word: item.word,
+            emoji: item.emoji
+        };
+    });
+}
+
+function startGame() {
+    generateGameLevels(); // Create dynamic randomized set of 15 levels
+    gameState.currentLevel = 0;
+    gameState.score = 0;
+    gameState.isPlaying = true;
+    document.getElementById('next-btn').classList.add('hidden'); // Hide next button on game start/reset
+    updateScoreUI();
+    switchScreen('game');
+    setTimeout(() => {
+        loadLevel(0);
+    }, 600);
+}
+
+function resetGame() {
+    startGame();
+}
+
+function updateScoreUI() {
+    scoreDisplay.innerText = gameState.score;
+    const progress = ((gameState.currentLevel) / activeLevels.length) * 100;
+    progressBar.style.width = `${progress}%`;
+}
+
+function loadLevel(index) {
+    if (index >= activeLevels.length) {
+        endGame();
+        return;
+    }
+
+    // Show question text and target card layouts properly again
+    document.getElementById('instruction-container').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('cards-container').classList.remove('opacity-0', 'pointer-events-none');
+
+    gameState.currentLevel = index;
+    gameState.waitingForNext = false;
+    const level = activeLevels[index];
+    
+    levelDisplay.innerText = index + 1;
+    updateScoreUI();
+    
+    // Clear previous cards
+    cardsContainer.innerHTML = '';
+    
+    // Shuffle choices visually but keep mapping to original master alphabet data for accurate lookup
+    let shuffledChoices = shuffleArray([...level.choices]);
+
+    shuffledChoices.forEach((choice, idx) => {
+        let cardData = masterAlphabetPool.find(p => p.letter === choice);
+        
+        let wordText = cardData ? cardData.word : "Word";
+        let emojiObj = cardData ? cardData.emoji : "❓";
+
+        const delay = idx * 0.15; // Staggered entrance animation
+
+        const cardHTML = `
+            <div onclick="checkAnswer('${choice}')" 
+                 class="ar-clickable glass-card rounded-2xl p-4 md:p-6 flex flex-col items-center justify-center cursor-pointer animate-bounce-in max-w-[200px] mx-auto w-full"
+                 style="animation-delay: ${delay}s;"
+                 data-letter="${choice}">
+                <div class="text-5xl md:text-7xl font-black text-blue-600 mb-1 english-font leading-none">${choice}</div>
+                <div class="text-3xl md:text-5xl mb-1">${emojiObj}</div>
+                <div class="text-lg md:text-xl font-bold text-gray-700 english-font">${wordText}</div>
+            </div>
+        `;
+        cardsContainer.innerHTML += cardHTML;
+    });
+
+    // Speak the target letter after cards appear
+    setTimeout(() => {
+        speakText(level.sound);
+    }, 800);
+}
+
+function checkAnswer(selectedLetter) {
+    if (gameState.waitingForNext) return;
+    gameState.waitingForNext = true;
+
+    const level = activeLevels[gameState.currentLevel];
+    const cards = document.querySelectorAll('.ar-clickable');
+    
+    if (selectedLetter === level.correct) {
+        // Correct
+        gameState.score += 100;
+        updateScoreUI();
+        speakText("Correct!");
+        showFeedback("Correct! 🎉", "text-green-500");
+        
+        // Highlight correct card
+        cards.forEach(card => {
+            if (card.dataset.letter === selectedLetter) {
+                card.classList.add('bg-green-100', 'border-green-400');
+                card.style.transform = 'scale(1.1)';
+            } else {
+                card.style.opacity = '0.3';
+            }
+        });
+
+        // Play the explosive nuclear effect
+        playNukeEffect();
+
+        // Hide instruction and option card elements neatly so next level screen has clean visual spacing
+        setTimeout(() => {
+            document.getElementById('instruction-container').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('cards-container').classList.add('opacity-0', 'pointer-events-none');
+        }, 1000);
+
+        // Display the "Next Level" button after nuke effect concludes
+        setTimeout(() => {
+            const nextBtn = document.getElementById('next-btn');
+            if (gameState.currentLevel === activeLevels.length - 1) {
+                nextBtn.innerText = "ดูคะแนนรวม 🎉";
+            } else {
+                nextBtn.innerText = "ด่านถัดไป ➔";
+            }
+            nextBtn.classList.remove('hidden');
+        }, 1500);
+
+    } else {
+        // Wrong
+        speakText("Try again");
+        showFeedback("Try Again 😊", "text-orange-500");
+        
+        // Shake wrong card
+        cards.forEach(card => {
+            if (card.dataset.letter === selectedLetter) {
+                card.classList.add('bg-red-100', 'animate-pulse');
+                setTimeout(() => card.classList.remove('bg-red-100', 'animate-pulse'), 1000);
+            }
+        });
+
+        // Restart entire game if wrong after a short duration
+        setTimeout(() => {
+            gameState.waitingForNext = false;
+            hideFeedback();
+            document.getElementById('next-btn').classList.add('hidden'); // Hide button
+            startGame(); // Reset to level 1 and score 0
+        }, 1500);
+    }
+}
+
+function goToNextLevel() {
+    document.getElementById('next-btn').classList.add('hidden');
+    hideFeedback();
+    loadLevel(gameState.currentLevel + 1);
+}
+
+function playNukeEffect() {
+    // White-yellow camera flash overlay
+    const flash = document.createElement('div');
+    flash.className = 'nuke-overlay';
+    flash.style.animation = 'nuke-flash 1.5s ease-out forwards';
+    document.body.appendChild(flash);
+
+    // Expanding radial fire blast
+    const fireball = document.createElement('div');
+    fireball.className = 'nuke-fireball-element';
+    fireball.style.animation = 'nuke-fireball 1.5s ease-out forwards';
+    document.body.appendChild(fireball);
+
+    // Clear nodes after animation cycle
+    setTimeout(() => {
+        flash.remove();
+        fireball.remove();
+    }, 1500);
+}
+
+function showFeedback(text, colorClass) {
+    feedbackMsg.innerText = text;
+    feedbackMsg.className = `absolute top-1/4 text-6xl md:text-8xl font-black text-center transition-all duration-300 pointer-events-none z-40 drop-shadow-[0_5px_5px_rgba(255,255,255,1)] opacity-100 scale-110 ${colorClass}`;
+}
+
+function hideFeedback() {
+    feedbackMsg.classList.remove('opacity-100', 'scale-110');
+    feedbackMsg.classList.add('opacity-0');
+}
+
+function endGame() {
+    gameState.isPlaying = false;
+    document.getElementById('final-score').innerText = gameState.score;
+    switchScreen('end');
+    speakText("All clear! Congratulations!");
+    createConfetti();
+}
+
+function createConfetti() {
+    for (let i = 0; i < 100; i++) {
+        let conf = document.createElement('div');
+        conf.className = 'confetti rounded-full';
+        conf.style.left = Math.random() * 100 + 'vw';
+        conf.style.top = -10 + 'px';
+        conf.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        document.body.appendChild(conf);
+
+        let duration = Math.random() * 3 + 2;
+        let delay = Math.random() * 2;
+        
+        conf.animate([
+            { transform: `translate3d(0,0,0) rotate(0deg)`, opacity: 1 },
+            { transform: `translate3d(${Math.random()*200 - 100}px, 100vh, 0) rotate(${Math.random()*720}deg)`, opacity: 0 }
+        ], {
+            duration: duration * 1000,
+            delay: delay * 1000,
+            easing: 'cubic-bezier(.37,0,.63,1)',
+            fill: 'forwards'
+        });
+
+        setTimeout(() => conf.remove(), (duration + delay) * 1000);
+    }
+}
+
+/* ==========================================================================
+   AR / MEDIAPIPE HAND TRACKING & DRAWING LOOP
+   ========================================================================== */
+const videoElement = document.getElementById('webcam');
+const canvasElement = document.getElementById('ar-canvas');
+const canvasCtx = canvasElement.getContext('2d');
+
+let handsData = null;
+let lastPinchState = false;
+let pinchCooldown = false;
+let currentHoveredElement = null;
+
+// Setup Canvas Size
+function resizeCanvas() {
+    canvasElement.width = window.innerWidth;
+    canvasElement.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Initialize MediaPipe Hands
+const hands = new Hands({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+}});
+
+hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
+});
+
+hands.onResults((results) => {
+    handsData = results;
+    
+    // Status Display Updates
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        statusDisplay.innerHTML = '✨ พบมือแล้ว!';
+        statusDisplay.classList.remove('text-pink-600');
+        statusDisplay.classList.add('text-green-600');
+        setTimeout(() => statusDisplay.style.opacity = '0', 2000); // fade out after recognition
+    } else {
+        statusDisplay.style.opacity = '1';
+        statusDisplay.innerHTML = '🔍 กำลังหามือของคุณ...';
+        statusDisplay.classList.add('text-pink-600');
+        statusDisplay.classList.remove('text-green-600');
+    }
+});
+
+// Initialize Camera with Fallback Handling
+const camera = new Camera(videoElement, {
+    onFrame: async () => {
+        await hands.send({image: videoElement});
+    },
+    width: 640,
+    height: 480
+});
+
+camera.start().catch((error) => {
+    console.warn("Camera failed to start (Fallback Activated):", error);
+    statusDisplay.innerHTML = '📷 ไม่พบกล้อง (ใช้เมาส์หรือนิ้วสัมผัสเล่นแทนได้)';
+    statusDisplay.classList.remove('text-pink-600', 'animate-pulse');
+    statusDisplay.classList.add('text-orange-600');
+    statusDisplay.style.opacity = '1';
+});
+
+// INDEPENDENT DRAW LOOP (Rendering Canvas + Overlay Cursor)
+function drawLoop() {
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    if (handsData && handsData.multiHandLandmarks && handsData.multiHandLandmarks.length > 0) {
+        const landmarks = handsData.multiHandLandmarks[0];
+        
+        canvasCtx.save();
+        // Mirror coordinates for seamless rendering
+        canvasCtx.scale(-1, 1);
+        canvasCtx.translate(-canvasElement.width, 0);
+
+        // Draw connections and landmarks
+        drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#ffffff', lineWidth: 4});
+        drawLandmarks(canvasCtx, landmarks, {color: '#FF69B4', lineWidth: 2, radius: 4});
+        canvasCtx.restore();
+
+        // Extract fingertips coordinates
+        const indexTip = landmarks[8];
+        const thumbTip = landmarks[4];
+
+        // Match coordinates to viewport size (Inverted X because of mirroring)
+        const screenX = (1 - indexTip.x) * canvasElement.width;
+        const screenY = indexTip.y * canvasElement.height;
+
+        // Pinch trigger distance
+        const dx = indexTip.x - thumbTip.x;
+        const dy = indexTip.y - thumbTip.y;
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        const isPinching = distance < PINCH_THRESHOLD;
+
+        // Intercept Element under AR cursor
+        canvasElement.style.visibility = 'hidden';
+        const hoveredElement = document.elementFromPoint(screenX, screenY);
+        canvasElement.style.visibility = 'visible';
+
+        let targetElement = null;
+        if (hoveredElement) {
+            targetElement = hoveredElement.closest('.ar-clickable');
+        }
+
+        // Apply Hover Style State
+        if (targetElement !== currentHoveredElement) {
+            if (currentHoveredElement) currentHoveredElement.classList.remove('ar-hover', 'ar-active');
+            if (targetElement) targetElement.classList.add('ar-hover');
+            currentHoveredElement = targetElement;
+        }
+
+        // Virtual Click Action on Pinch
+        if (isPinching && !lastPinchState && !pinchCooldown) {
+            if (targetElement) {
+                targetElement.classList.add('ar-active');
+                targetElement.click(); // Triggers target action
+                
+                pinchCooldown = true;
+                setTimeout(() => { pinchCooldown = false; }, 500); // 0.5s click block
+            }
+        } else if (!isPinching) {
+            if (targetElement) {
+                targetElement.classList.remove('ar-active');
+            }
+        }
+        lastPinchState = isPinching;
+
+        // Render AR Cursor Circle
+        canvasCtx.beginPath();
+        canvasCtx.arc(screenX, screenY, 15, 0, 2 * Math.PI);
+        
+        if (isPinching && targetElement) {
+            canvasCtx.fillStyle = 'rgba(74, 222, 128, 0.85)'; // Green for click
+            canvasCtx.strokeStyle = '#fff';
+            canvasCtx.fill();
+            canvasCtx.stroke();
+            canvasCtx.font = '18px sans-serif';
+            canvasCtx.fillStyle = '#fff';
+            canvasCtx.textAlign = 'center';
+            canvasCtx.textBaseline = 'middle';
+            canvasCtx.fillText('✔️', screenX, screenY);
+        } else if (isPinching && !targetElement) {
+            canvasCtx.fillStyle = 'rgba(239, 68, 68, 0.6)'; // Red for empty press
+            canvasCtx.fill();
+        } else if (targetElement) {
+            canvasCtx.fillStyle = 'rgba(250, 204, 21, 0.45)'; // Yellow hover halo
+            canvasCtx.fill();
+            canvasCtx.setLineDash([5, 5]);
+            canvasCtx.strokeStyle = '#eab308';
+            canvasCtx.lineWidth = 3;
+            canvasCtx.stroke();
+            canvasCtx.setLineDash([]);
+        } else {
+            canvasCtx.fillStyle = 'rgba(59, 130, 246, 0.6)'; // Standard blue tracker
+            canvasCtx.fill();
+            canvasCtx.strokeStyle = '#fff';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.stroke();
+        }
+    } else {
+        if (currentHoveredElement) {
+            currentHoveredElement.classList.remove('ar-hover', 'ar-active');
+            currentHoveredElement = null;
+        }
+    }
+
+    requestAnimationFrame(drawLoop);
+}
+
+// Fire the continuous render loop
+drawLoop();
+
+</script>
+</body>
+</html>
