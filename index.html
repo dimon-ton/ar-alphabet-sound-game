@@ -223,7 +223,8 @@
             <!-- Top Bar -->
             <div class="flex justify-between items-start p-4 md:p-8 w-full pointer-events-auto">
                 <div class="glass px-6 py-3 rounded-2xl text-xl md:text-3xl font-bold text-blue-700">
-                    ด่าน: <span id="level-display">1</span>/15
+                    <div id="stage-display">Stage 1</div>
+                    <div class="text-base md:text-xl text-blue-500">Question <span id="level-display">1</span>/30</div>
                 </div>
                 
                 <div class="glass px-6 py-3 rounded-2xl text-xl md:text-3xl font-bold text-green-600 flex flex-col items-end">
@@ -254,7 +255,7 @@
                 </div>
 
                 <!-- Next Button (ปุ่มด่านถัดไป - ย้ายมาแสดงตรงกลางหน้าจอ) -->
-                <button id="next-btn" onclick="goToNextLevel()" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ar-clickable bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 border-4 border-white text-white font-black text-3xl md:text-5xl py-6 px-12 rounded-full shadow-[0_15px_30px_rgba(59,130,246,0.6)] transition-all hover:scale-110 active:scale-95 animate-bounce z-50 cursor-pointer pointer-events-auto w-auto whitespace-nowrap">
+                <button id="next-btn" onclick="proceedAfterCorrect()" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ar-clickable bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 border-4 border-white text-white font-black text-3xl md:text-5xl py-6 px-12 rounded-full shadow-[0_15px_30px_rgba(59,130,246,0.6)] transition-all hover:scale-110 active:scale-95 animate-bounce z-50 cursor-pointer pointer-events-auto w-auto whitespace-nowrap">
                     ด่านถัดไป ➔
                 </button>
             </div>
@@ -262,6 +263,22 @@
             <!-- Progress Bar -->
             <div class="w-full h-4 bg-white/50 absolute bottom-0 pointer-events-none">
                 <div id="progress-bar" class="h-full bg-gradient-to-r from-green-400 to-blue-500 w-0 transition-all duration-500"></div>
+            </div>
+        </div>
+
+        <!-- ================== STAGE CLEAR MODAL ================== -->
+        <div id="stage-clear-modal" class="absolute inset-0 z-50 hidden opacity-0 transition-opacity duration-500 bg-white/60 backdrop-blur-xl flex items-center justify-center p-4">
+            <div class="glass rounded-3xl p-6 md:p-10 text-center max-w-2xl w-11/12 animate-bounce-in">
+                <h2 id="stage-clear-title" class="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-blue-500 to-pink-500 english-font">
+                    Stage Clear!
+                </h2>
+                <img id="stage-creature-img" src="" alt="" class="w-48 h-48 md:w-64 md:h-64 object-contain mx-auto mb-4 drop-shadow-xl">
+                <h3 id="stage-creature-name" class="text-3xl md:text-5xl font-black text-blue-600 english-font mb-1">Creature</h3>
+                <p id="stage-creature-thai" class="text-2xl md:text-3xl font-bold text-pink-500 mb-3">ชื่อไทย</p>
+                <p id="stage-creature-description" class="text-lg md:text-2xl font-semibold text-gray-700 mb-8">Description</p>
+                <button onclick="continueAfterStageClear()" class="ar-clickable bg-green-400 hover:bg-green-500 border-4 border-white text-white font-black text-3xl md:text-5xl py-4 px-10 rounded-full shadow-[0_10px_20px_rgba(74,222,128,0.5)] transition transform hover:scale-110 active:scale-95 cursor-pointer">
+                    Continue
+                </button>
             </div>
         </div>
 
@@ -275,7 +292,7 @@
                 
                 <div class="bg-white/80 rounded-3xl p-8 mb-10 shadow-inner">
                     <p class="text-3xl text-gray-600 mb-2">Total Score</p>
-                    <p id="final-score" class="text-7xl md:text-9xl font-black text-blue-600 english-font">1500</p>
+                    <p id="final-score" class="text-7xl md:text-9xl font-black text-blue-600 english-font">3000</p>
                 </div>
 
                 <button onclick="resetGame()" class="ar-clickable bg-gradient-to-r from-blue-400 to-purple-500 hover:from-blue-500 hover:to-purple-600 border-4 border-white text-white font-black text-3xl md:text-5xl py-5 px-10 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.2)] transition transform hover:scale-110 active:scale-95 cursor-pointer">
@@ -325,7 +342,9 @@ const masterAlphabetPool = [
 /* ==========================================================================
    STATE & CONSTANTS
    ========================================================================== */
-let activeLevels = []; // Will store the 15 randomly selected levels for the current game
+let activeLevels = []; // Stores the 30 staged questions for the current game
+let selectedCreatureLine = null;
+let pendingStageClear = null;
 let gameState = {
     currentScreen: 'splash', // splash, instruction, game, end
     currentLevel: 0,
@@ -334,7 +353,11 @@ let gameState = {
     waitingForNext: false
 };
 
-const MAX_SCORE = 1500;
+const QUESTIONS_PER_STAGE = 10;
+const TOTAL_STAGES = 3;
+const TOTAL_QUESTIONS = QUESTIONS_PER_STAGE * TOTAL_STAGES;
+const POINTS_PER_CORRECT = 100;
+const MAX_SCORE = TOTAL_QUESTIONS * POINTS_PER_CORRECT;
 const PINCH_THRESHOLD = 0.05; // Distance threshold for pinching
 let synth = window.speechSynthesis;
 
@@ -347,10 +370,66 @@ const screens = {
 };
 const cardsContainer = document.getElementById('cards-container');
 const levelDisplay = document.getElementById('level-display');
+const stageDisplay = document.getElementById('stage-display');
 const scoreDisplay = document.getElementById('score-display');
 const feedbackMsg = document.getElementById('feedback-msg');
 const progressBar = document.getElementById('progress-bar');
 const statusDisplay = document.getElementById('hand-status');
+const stageClearModal = document.getElementById('stage-clear-modal');
+const stageClearTitle = document.getElementById('stage-clear-title');
+const stageCreatureImg = document.getElementById('stage-creature-img');
+const stageCreatureName = document.getElementById('stage-creature-name');
+const stageCreatureThai = document.getElementById('stage-creature-thai');
+const stageCreatureDescription = document.getElementById('stage-creature-description');
+
+const gameStages = [
+    { number: 1, title: 'Stage 1', label: 'Uppercase Letters', mode: 'uppercase' },
+    { number: 2, title: 'Stage 2', label: 'Lowercase Letters', mode: 'lowercase' },
+    { number: 3, title: 'Stage 3', label: 'Mixed Letters', mode: 'mixed' }
+];
+
+const creatureLines = [
+    {
+        line: 'Star Line',
+        forms: [
+            { english: 'Star Cub', thai: 'ลูกดาวน้อย', description: 'A gentle star friend that glows when learners finish uppercase letters.', image: 'assets/creatures/star-cub.svg' },
+            { english: 'Star Fox', thai: 'จิ้งจอกดาว', description: 'Its bright tail helps guide learners through lowercase letters.', image: 'assets/creatures/star-fox.svg' },
+            { english: 'Star Guardian', thai: 'ผู้พิทักษ์ดวงดาว', description: 'A calm sky protector that celebrates every mixed-letter victory.', image: 'assets/creatures/star-guardian.svg' }
+        ]
+    },
+    {
+        line: 'Bubble Line',
+        forms: [
+            { english: 'Bubble Hatch', thai: 'ฟองไข่น้อย', description: 'A bubbly beginner that bounces happily after Stage 1.', image: 'assets/creatures/bubble-hatch.svg' },
+            { english: 'Bubble Dino', thai: 'ไดโนฟองสบู่', description: 'A playful dino that carries letter sounds in floating bubbles.', image: 'assets/creatures/bubble-dino.svg' },
+            { english: 'Bubble Dragon', thai: 'มังกรฟองฟ้า', description: 'A friendly dragon that blows rainbow bubbles for clear reading.', image: 'assets/creatures/bubble-dragon.svg' }
+        ]
+    },
+    {
+        line: 'Leaf Line',
+        forms: [
+            { english: 'Leaf Sprout', thai: 'ต้นอ่อนใบไม้', description: 'A tiny sprout that grows with each correct letter.', image: 'assets/creatures/leaf-sprout.svg' },
+            { english: 'Leaf Bunny', thai: 'กระต่ายใบไม้', description: 'A quick forest helper that listens carefully to every sound.', image: 'assets/creatures/leaf-bunny.svg' },
+            { english: 'Forest Hero', thai: 'ฮีโร่ป่าใส', description: 'A brave woodland friend that cheers for the full alphabet quest.', image: 'assets/creatures/forest-hero.svg' }
+        ]
+    },
+    {
+        line: 'Cloud Line',
+        forms: [
+            { english: 'Cloud Kitten', thai: 'ลูกแมวเมฆ', description: 'A soft cloud kitten that naps on successful uppercase practice.', image: 'assets/creatures/cloud-kitten.svg' },
+            { english: 'Cloud Cat', thai: 'แมวเมฆฟู', description: 'A floating cat that purrs along with lowercase sounds.', image: 'assets/creatures/cloud-cat.svg' },
+            { english: 'Sky Spirit', thai: 'ภูตท้องฟ้า', description: 'A bright sky spirit that watches over confident readers.', image: 'assets/creatures/sky-spirit.svg' }
+        ]
+    },
+    {
+        line: 'Spark Line',
+        forms: [
+            { english: 'Spark Chick', thai: 'ลูกเจี๊ยบประกาย', description: 'A tiny spark chick that twinkles after the first ten answers.', image: 'assets/creatures/spark-chick.svg' },
+            { english: 'Spark Bird', thai: 'นกประกายไฟ', description: 'A cheerful bird that lights up lowercase practice.', image: 'assets/creatures/spark-bird.svg' },
+            { english: 'Thunder Phoenix', thai: 'ฟีนิกซ์สายฟ้า', description: 'A kind thunder phoenix that shines for all 30 questions.', image: 'assets/creatures/thunder-phoenix.svg' }
+        ]
+    }
+];
 
 /* ==========================================================================
    SPEECH SYNTHESIS
@@ -409,38 +488,61 @@ function shuffleArray(array) {
     return array;
 }
 
-// Generate the 15 levels session dynamically from the master pool (A-Z)
-function generateGameLevels() {
-    // 1. Shuffle all 26 letters
-    let shuffledPool = shuffleArray([...masterAlphabetPool]);
-    
-    // 2. Select first 15 letters
-    let selectedLetters = shuffledPool.slice(0, 15);
-    
-    // 3. Build level objects with randomized choices
-    activeLevels = selectedLetters.map(item => {
-        // Find candidate wrong letters from master pool
-        let wrongCandidates = masterAlphabetPool.filter(p => p.letter !== item.letter);
-        let shuffledWrong = shuffleArray([...wrongCandidates]);
-        
-        // Take 2 unique incorrect letters and combine with correct one
-        let choices = [item.letter, shuffledWrong[0].letter, shuffledWrong[1].letter];
-        
+function formatLetterForStage(letter, mode) {
+    if (mode === 'lowercase') return letter.toLowerCase();
+    if (mode === 'mixed') return Math.random() < 0.5 ? letter : letter.toLowerCase();
+    return letter;
+}
+
+function getSoundPrompt(letter) {
+    const letterType = letter === letter.toUpperCase() ? 'uppercase' : 'lowercase';
+    return `${letterType} ${letter}`;
+}
+
+function buildStageQuestions(stage) {
+    const selectedLetters = shuffleArray([...masterAlphabetPool]).slice(0, QUESTIONS_PER_STAGE);
+
+    return selectedLetters.map(item => {
+        const correct = formatLetterForStage(item.letter, stage.mode);
+        const wrongCandidates = shuffleArray(masterAlphabetPool.filter(p => p.letter !== item.letter));
+        const choices = [
+            correct,
+            formatLetterForStage(wrongCandidates[0].letter, stage.mode),
+            formatLetterForStage(wrongCandidates[1].letter, stage.mode)
+        ];
+
         return {
-            sound: item.letter,
-            correct: item.letter,
-            choices: choices, // This will be shuffled again visually in loadLevel()
+            stage: stage.number,
+            stageTitle: stage.title,
+            stageLabel: stage.label,
+            sound: correct,
+            soundPrompt: getSoundPrompt(correct),
+            correct: correct,
+            choices: choices,
             word: item.word,
             emoji: item.emoji
         };
     });
 }
 
+// Generate the 30-question staged session dynamically from the master pool (A-Z)
+function generateGameLevels() {
+    activeLevels = gameStages.flatMap(stage => buildStageQuestions(stage));
+}
+
+function selectCreatureLine() {
+    selectedCreatureLine = creatureLines[Math.floor(Math.random() * creatureLines.length)];
+    updateVrCreatureDisplay(null);
+}
+
 function startGame() {
-    generateGameLevels(); // Create dynamic randomized set of 15 levels
+    generateGameLevels(); // Create dynamic randomized set of 30 staged levels
+    selectCreatureLine(); // Reset reward creature for every new run
+    pendingStageClear = null;
     gameState.currentLevel = 0;
     gameState.score = 0;
     gameState.isPlaying = true;
+    stageClearModal.classList.add('hidden', 'opacity-0');
     document.getElementById('next-btn').classList.add('hidden'); // Hide next button on game start/reset
     updateScoreUI();
     switchScreen('game');
@@ -455,7 +557,8 @@ function resetGame() {
 
 function updateScoreUI() {
     scoreDisplay.innerText = gameState.score;
-    const progress = ((gameState.currentLevel) / activeLevels.length) * 100;
+    const completedQuestions = gameState.score / POINTS_PER_CORRECT;
+    const progress = (completedQuestions / TOTAL_QUESTIONS) * 100;
     progressBar.style.width = `${progress}%`;
 }
 
@@ -474,6 +577,7 @@ function loadLevel(index) {
     const level = activeLevels[index];
     
     levelDisplay.innerText = index + 1;
+    stageDisplay.innerText = `${level.stageTitle}: ${level.stageLabel}`;
     updateScoreUI();
     
     // Clear previous cards
@@ -483,7 +587,7 @@ function loadLevel(index) {
     let shuffledChoices = shuffleArray([...level.choices]);
 
     shuffledChoices.forEach((choice, idx) => {
-        let cardData = masterAlphabetPool.find(p => p.letter === choice);
+        let cardData = masterAlphabetPool.find(p => p.letter === choice.toUpperCase());
         
         let wordText = cardData ? cardData.word : "Word";
         let emojiObj = cardData ? cardData.emoji : "❓";
@@ -505,7 +609,7 @@ function loadLevel(index) {
 
     // Speak the target letter after cards appear
     setTimeout(() => {
-        speakText(level.sound);
+        speakText(level.soundPrompt);
     }, 800);
 }
 
@@ -514,11 +618,11 @@ function checkAnswer(selectedLetter) {
     gameState.waitingForNext = true;
 
     const level = activeLevels[gameState.currentLevel];
-    const cards = document.querySelectorAll('.ar-clickable');
+    const cards = document.querySelectorAll('#cards-container .ar-clickable');
     
     if (selectedLetter === level.correct) {
         // Correct
-        gameState.score += 100;
+        gameState.score = Math.min(gameState.score + POINTS_PER_CORRECT, MAX_SCORE);
         updateScoreUI();
         speakText("Correct!");
         showFeedback("Correct! 🎉", "text-green-500");
@@ -545,8 +649,8 @@ function checkAnswer(selectedLetter) {
         // Display the "Next Level" button after nuke effect concludes
         setTimeout(() => {
             const nextBtn = document.getElementById('next-btn');
-            if (gameState.currentLevel === activeLevels.length - 1) {
-                nextBtn.innerText = "ดูคะแนนรวม 🎉";
+            if (isStageComplete(gameState.currentLevel)) {
+                nextBtn.innerText = gameState.currentLevel === activeLevels.length - 1 ? "ดูรางวัลสุดท้าย 🎉" : "ดูรางวัล!";
             } else {
                 nextBtn.innerText = "ด่านถัดไป ➔";
             }
@@ -576,10 +680,95 @@ function checkAnswer(selectedLetter) {
     }
 }
 
-function goToNextLevel() {
+function isStageComplete(levelIndex) {
+    return (levelIndex + 1) % QUESTIONS_PER_STAGE === 0;
+}
+
+function proceedAfterCorrect() {
     document.getElementById('next-btn').classList.add('hidden');
     hideFeedback();
+
+    if (isStageComplete(gameState.currentLevel)) {
+        showStageClearModal(activeLevels[gameState.currentLevel].stage);
+        return;
+    }
+
     loadLevel(gameState.currentLevel + 1);
+}
+
+function showStageClearModal(stageNumber) {
+    pendingStageClear = stageNumber;
+    const creature = selectedCreatureLine.forms[stageNumber - 1];
+    stageClearTitle.innerText = stageNumber === TOTAL_STAGES ? 'Final Evolution!' : `Stage ${stageNumber} Clear!`;
+    stageCreatureImg.src = creature.image;
+    stageCreatureImg.alt = creature.english;
+    stageCreatureName.innerText = creature.english;
+    stageCreatureThai.innerText = creature.thai;
+    stageCreatureDescription.innerText = creature.description;
+    updateVrCreatureDisplay(creature);
+
+    stageClearModal.classList.remove('hidden');
+    requestAnimationFrame(() => stageClearModal.classList.remove('opacity-0'));
+    speakText(stageNumber === TOTAL_STAGES ? 'Final evolution!' : `Stage ${stageNumber} clear!`);
+}
+
+function continueAfterStageClear() {
+    stageClearModal.classList.add('opacity-0');
+    setTimeout(() => stageClearModal.classList.add('hidden'), 500);
+
+    if (pendingStageClear === TOTAL_STAGES) {
+        pendingStageClear = null;
+        endGame();
+        return;
+    }
+
+    pendingStageClear = null;
+    loadLevel(gameState.currentLevel + 1);
+}
+
+function updateVrCreatureDisplay(creature) {
+    if (window.AFRAME && document.querySelector('a-scene')) {
+        const scene = document.querySelector('a-scene');
+        let creatureEntity = document.getElementById('vr-creature');
+
+        if (!creature) {
+            if (creatureEntity) creatureEntity.removeAttribute('src');
+            return;
+        }
+
+        if (!creatureEntity) {
+            creatureEntity = document.createElement('a-image');
+            creatureEntity.id = 'vr-creature';
+            creatureEntity.setAttribute('position', '0 1.6 -2');
+            creatureEntity.setAttribute('width', '1.4');
+            creatureEntity.setAttribute('height', '1.4');
+            scene.appendChild(creatureEntity);
+        }
+
+        creatureEntity.setAttribute('src', creature.image);
+        return;
+    }
+
+    if (window.THREE && window.vrScene && creature) {
+        const texture = new THREE.TextureLoader().load(creature.image);
+
+        if (!window.vrCreatureSprite) {
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            window.vrCreatureSprite = new THREE.Sprite(material);
+            window.vrCreatureSprite.name = 'vr-creature';
+            window.vrCreatureSprite.position.set(0, 1.6, -2);
+            window.vrCreatureSprite.scale.set(1.4, 1.4, 1.4);
+            window.vrScene.add(window.vrCreatureSprite);
+        } else {
+            window.vrCreatureSprite.material.map = texture;
+            window.vrCreatureSprite.material.needsUpdate = true;
+        }
+
+        return;
+    }
+
+    // Placeholder integration point: this project does not currently load A-Frame, Three.js, or WebXR.
+    window.currentVrCreature = creature;
 }
 
 function playNukeEffect() {
