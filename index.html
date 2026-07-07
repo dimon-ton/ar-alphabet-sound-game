@@ -495,8 +495,7 @@ function formatLetterForStage(letter, mode) {
 }
 
 function getSoundPrompt(letter) {
-    const letterType = letter === letter.toUpperCase() ? 'uppercase' : 'lowercase';
-    return `${letterType} ${letter}`;
+    return letter;
 }
 
 function buildStageQuestions(stage) {
