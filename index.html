@@ -170,9 +170,52 @@
             filter: drop-shadow(0 12px 18px rgba(31, 38, 135, 0.25));
         }
 
+        .creature-image-frame {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .creature-image-frame img {
+            transition: opacity 0.2s ease;
+        }
+
+        .creature-loading-spinner {
+            position: absolute;
+            width: 2.75rem;
+            height: 2.75rem;
+            border: 5px solid rgba(255, 255, 255, 0.75);
+            border-top-color: #ec4899;
+            border-right-color: #60a5fa;
+            border-radius: 9999px;
+            opacity: 0;
+            pointer-events: none;
+            animation: creature-spin 0.8s linear infinite;
+            transition: opacity 0.2s ease;
+        }
+
+        .creature-image-frame.is-loading img {
+            opacity: 0.2;
+        }
+
+        .creature-image-frame.is-loading .creature-loading-spinner {
+            opacity: 1;
+        }
+
+        @keyframes creature-spin {
+            to { transform: rotate(360deg); }
+        }
+
         @media (max-width: 640px) {
             .creature-companion {
                 width: 64px;
+            }
+
+            .creature-loading-spinner {
+                width: 2rem;
+                height: 2rem;
+                border-width: 4px;
             }
         }
     </style>
@@ -248,7 +291,10 @@
                 <div class="flex items-start gap-2 md:gap-4">
                     <!-- Evolution creature companion -->
                     <div id="creature-companion" class="creature-companion hidden opacity-0 transition-opacity duration-500">
-                        <img id="creature-companion-img" src="" alt="">
+                        <div id="creature-companion-frame" class="creature-image-frame">
+                            <div class="creature-loading-spinner" aria-hidden="true"></div>
+                            <img id="creature-companion-img" src="" alt="">
+                        </div>
                         <div class="glass rounded-2xl px-2 md:px-3 py-1 md:py-2 text-center -mt-2">
                             <div id="creature-companion-name" class="english-font text-[10px] md:text-base font-black text-blue-600 leading-tight">Creature</div>
                             <div id="creature-companion-stage" class="text-[11px] md:text-sm font-bold text-pink-500 leading-tight">Stage 1</div>
@@ -302,7 +348,10 @@
                 <h2 id="stage-clear-title" class="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-blue-500 to-pink-500 english-font">
                     Stage Clear!
                 </h2>
-                <img id="stage-creature-img" src="" alt="" class="w-48 h-48 md:w-64 md:h-64 object-contain mx-auto mb-4 drop-shadow-xl">
+                <div id="stage-creature-frame" class="creature-image-frame mx-auto mb-4">
+                    <div class="creature-loading-spinner" aria-hidden="true"></div>
+                    <img id="stage-creature-img" src="" alt="" class="w-48 h-48 md:w-64 md:h-64 object-contain drop-shadow-xl">
+                </div>
                 <h3 id="stage-creature-name" class="text-3xl md:text-5xl font-black text-blue-600 english-font mb-1">Creature</h3>
                 <p id="stage-creature-thai" class="text-2xl md:text-3xl font-bold text-pink-500 mb-3">ชื่อไทย</p>
                 <p id="stage-creature-description" class="text-lg md:text-2xl font-semibold text-gray-700 mb-8">Description</p>
@@ -407,11 +456,13 @@ const progressBar = document.getElementById('progress-bar');
 const statusDisplay = document.getElementById('hand-status');
 const stageClearModal = document.getElementById('stage-clear-modal');
 const stageClearTitle = document.getElementById('stage-clear-title');
+const stageCreatureFrame = document.getElementById('stage-creature-frame');
 const stageCreatureImg = document.getElementById('stage-creature-img');
 const stageCreatureName = document.getElementById('stage-creature-name');
 const stageCreatureThai = document.getElementById('stage-creature-thai');
 const stageCreatureDescription = document.getElementById('stage-creature-description');
 const creatureCompanion = document.getElementById('creature-companion');
+const creatureCompanionFrame = document.getElementById('creature-companion-frame');
 const creatureCompanionImg = document.getElementById('creature-companion-img');
 const creatureCompanionName = document.getElementById('creature-companion-name');
 const creatureCompanionStage = document.getElementById('creature-companion-stage');
@@ -643,6 +694,20 @@ function getCreatureForm(formIndex) {
     return selectedCreatureLine.forms[Math.min(Math.max(formIndex, 0), selectedCreatureLine.forms.length - 1)];
 }
 
+function setCreatureImage(imageElement, frameElement, src, alt) {
+    if (imageElement.src.endsWith(src) && imageElement.complete) {
+        imageElement.alt = alt;
+        frameElement.classList.remove('is-loading');
+        return;
+    }
+
+    frameElement.classList.add('is-loading');
+    imageElement.onload = () => frameElement.classList.remove('is-loading');
+    imageElement.onerror = () => frameElement.classList.remove('is-loading');
+    imageElement.alt = alt;
+    imageElement.src = src;
+}
+
 function startGame() {
     generateGameLevels(); // Create dynamic randomized set of 20 staged levels
     selectCreatureLine(); // Reset reward creature for every new run
@@ -822,8 +887,7 @@ function showStageClearModal(stageNumber) {
     } else {
         stageClearTitle.innerText = `Stage ${stageNumber} Clear!`;
     }
-    stageCreatureImg.src = creature.image;
-    stageCreatureImg.alt = creature.english;
+    setCreatureImage(stageCreatureImg, stageCreatureFrame, creature.image, creature.english);
     stageCreatureName.innerText = creature.english;
     stageCreatureThai.innerText = creature.thai;
     stageCreatureDescription.innerText = creature.description;
@@ -900,8 +964,7 @@ function updateCreatureDisplay(stageNumber) {
 
     const formIndex = Math.min(Math.max(stageNumber, 1) - 1, selectedCreatureLine.forms.length - 1);
     const creature = getCreatureForm(formIndex);
-    creatureCompanionImg.src = creature.image;
-    creatureCompanionImg.alt = creature.english;
+    setCreatureImage(creatureCompanionImg, creatureCompanionFrame, creature.image, creature.english);
     creatureCompanionName.innerText = creature.english;
     creatureCompanionStage.innerText = `Stage ${Math.min(stageNumber, TOTAL_STAGES)} Evolution`;
 }
