@@ -159,11 +159,7 @@
         .english-font { font-family: 'Nunito', sans-serif; }
 
         .creature-companion {
-            position: absolute;
-            left: 1rem;
-            bottom: 1.25rem;
-            z-index: 35;
-            width: min(32vw, 180px);
+            width: clamp(82px, 14vw, 130px);
             pointer-events: none;
         }
 
@@ -176,9 +172,7 @@
 
         @media (max-width: 640px) {
             .creature-companion {
-                width: 118px;
-                left: 0.5rem;
-                bottom: 1rem;
+                width: 64px;
             }
         }
     </style>
@@ -245,15 +239,26 @@
         <div id="screen-game" class="absolute inset-0 flex flex-col z-30 hidden opacity-0 transition-opacity duration-500 pointer-events-none">
             
             <!-- Top Bar -->
-            <div class="flex justify-between items-start p-4 md:p-8 w-full pointer-events-auto">
-                <div class="glass px-6 py-3 rounded-2xl text-xl md:text-3xl font-bold text-blue-700">
+            <div class="flex justify-between items-start gap-2 p-3 md:p-8 w-full pointer-events-auto">
+                <div class="glass px-3 md:px-6 py-2 md:py-3 rounded-2xl text-base md:text-3xl font-bold text-blue-700">
                     <div id="stage-display">Stage 1</div>
-                    <div class="text-base md:text-xl text-blue-500">Question <span id="level-display">1</span>/20</div>
+                    <div class="text-xs md:text-xl text-blue-500">Question <span id="level-display">1</span>/20</div>
                 </div>
                 
-                <div class="glass px-6 py-3 rounded-2xl text-xl md:text-3xl font-bold text-green-600 flex flex-col items-end">
-                    <span>คะแนน</span>
-                    <span id="score-display" class="text-3xl md:text-5xl english-font">0</span>
+                <div class="flex items-start gap-2 md:gap-4">
+                    <!-- Evolution creature companion -->
+                    <div id="creature-companion" class="creature-companion hidden opacity-0 transition-opacity duration-500">
+                        <img id="creature-companion-img" src="" alt="">
+                        <div class="glass rounded-2xl px-2 md:px-3 py-1 md:py-2 text-center -mt-2">
+                            <div id="creature-companion-name" class="english-font text-[10px] md:text-base font-black text-blue-600 leading-tight">Creature</div>
+                            <div id="creature-companion-stage" class="text-[11px] md:text-sm font-bold text-pink-500 leading-tight">Stage 1</div>
+                        </div>
+                    </div>
+
+                    <div class="glass px-3 md:px-6 py-2 md:py-3 rounded-2xl text-base md:text-3xl font-bold text-green-600 flex flex-col items-end">
+                        <span>คะแนน</span>
+                        <span id="score-display" class="text-2xl md:text-5xl english-font">0</span>
+                    </div>
                 </div>
             </div>
 
@@ -283,14 +288,6 @@
                     ด่านถัดไป ➔
                 </button>
 
-                <!-- Evolution creature companion -->
-                <div id="creature-companion" class="creature-companion hidden opacity-0 transition-opacity duration-500">
-                    <img id="creature-companion-img" src="" alt="">
-                    <div class="glass rounded-2xl px-3 py-2 text-center -mt-3">
-                        <div id="creature-companion-name" class="english-font text-base md:text-xl font-black text-blue-600 leading-tight">Creature</div>
-                        <div id="creature-companion-stage" class="text-sm md:text-base font-bold text-pink-500 leading-tight">Stage 1</div>
-                    </div>
-                </div>
             </div>
             
             <!-- Progress Bar -->
@@ -642,6 +639,10 @@ function selectCreatureLine() {
     updateCreatureDisplay(1);
 }
 
+function getCreatureForm(formIndex) {
+    return selectedCreatureLine.forms[Math.min(Math.max(formIndex, 0), selectedCreatureLine.forms.length - 1)];
+}
+
 function startGame() {
     generateGameLevels(); // Create dynamic randomized set of 20 staged levels
     selectCreatureLine(); // Reset reward creature for every new run
@@ -774,6 +775,7 @@ function checkAnswer(selectedLetter) {
         playTryAgainSound();
         speakText("Try again");
         showFeedback("Try Again 😊", "text-orange-500");
+        document.getElementById('next-btn').classList.add('hidden');
         
         // Shake wrong card
         cards.forEach(card => {
@@ -783,11 +785,11 @@ function checkAnswer(selectedLetter) {
             }
         });
 
-        // Keep the same question active so accidental taps or pinches do not reset the run.
+        // Reset the run after a wrong selection. Evolution rewards stay locked until a stage is passed.
         setTimeout(() => {
-            gameState.waitingForNext = false;
             hideFeedback();
-        }, 900);
+            startGame();
+        }, 1200);
     }
 }
 
@@ -809,8 +811,10 @@ function proceedAfterCorrect() {
 
 function showStageClearModal(stageNumber) {
     pendingStageClear = stageNumber;
-    const creatureIndex = Math.min(stageNumber - 1, selectedCreatureLine.forms.length - 1);
-    const creature = selectedCreatureLine.forms[creatureIndex];
+    // Reward the next evolution only after the student passes the stage.
+    // Example: Stage 1 uses 01_stage.png during play, then rewards 02_stage.png.
+    const rewardFormIndex = stageNumber === TOTAL_STAGES ? selectedCreatureLine.forms.length - 1 : stageNumber;
+    const creature = getCreatureForm(rewardFormIndex);
     if (stageNumber === TOTAL_STAGES) {
         stageClearTitle.innerText = 'Alphabet Master!';
     } else if (stageNumber === selectedCreatureLine.forms.length) {
@@ -823,7 +827,7 @@ function showStageClearModal(stageNumber) {
     stageCreatureName.innerText = creature.english;
     stageCreatureThai.innerText = creature.thai;
     stageCreatureDescription.innerText = creature.description;
-    updateCreatureDisplay(stageNumber);
+    updateCreatureDisplay(stageNumber + 1);
     updateVrCreatureDisplay(creature);
 
     stageClearModal.classList.remove('hidden');
@@ -895,11 +899,11 @@ function updateCreatureDisplay(stageNumber) {
     if (!selectedCreatureLine) return;
 
     const formIndex = Math.min(Math.max(stageNumber, 1) - 1, selectedCreatureLine.forms.length - 1);
-    const creature = selectedCreatureLine.forms[formIndex];
+    const creature = getCreatureForm(formIndex);
     creatureCompanionImg.src = creature.image;
     creatureCompanionImg.alt = creature.english;
     creatureCompanionName.innerText = creature.english;
-    creatureCompanionStage.innerText = `Stage ${stageNumber} Evolution`;
+    creatureCompanionStage.innerText = `Stage ${Math.min(stageNumber, TOTAL_STAGES)} Evolution`;
 }
 
 function playNukeEffect() {
