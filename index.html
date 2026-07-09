@@ -157,6 +157,30 @@
         }
         
         .english-font { font-family: 'Nunito', sans-serif; }
+
+        .creature-companion {
+            position: absolute;
+            left: 1rem;
+            bottom: 1.25rem;
+            z-index: 35;
+            width: min(32vw, 180px);
+            pointer-events: none;
+        }
+
+        .creature-companion img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            filter: drop-shadow(0 12px 18px rgba(31, 38, 135, 0.25));
+        }
+
+        @media (max-width: 640px) {
+            .creature-companion {
+                width: 118px;
+                left: 0.5rem;
+                bottom: 1rem;
+            }
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -258,6 +282,15 @@
                 <button id="next-btn" onclick="proceedAfterCorrect()" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ar-clickable bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 border-4 border-white text-white font-black text-3xl md:text-5xl py-6 px-12 rounded-full shadow-[0_15px_30px_rgba(59,130,246,0.6)] transition-all hover:scale-110 active:scale-95 animate-bounce z-50 cursor-pointer pointer-events-auto w-auto whitespace-nowrap">
                     ด่านถัดไป ➔
                 </button>
+
+                <!-- Evolution creature companion -->
+                <div id="creature-companion" class="creature-companion hidden opacity-0 transition-opacity duration-500">
+                    <img id="creature-companion-img" src="" alt="">
+                    <div class="glass rounded-2xl px-3 py-2 text-center -mt-3">
+                        <div id="creature-companion-name" class="english-font text-base md:text-xl font-black text-blue-600 leading-tight">Creature</div>
+                        <div id="creature-companion-stage" class="text-sm md:text-base font-bold text-pink-500 leading-tight">Stage 1</div>
+                    </div>
+                </div>
             </div>
             
             <!-- Progress Bar -->
@@ -381,6 +414,10 @@ const stageCreatureImg = document.getElementById('stage-creature-img');
 const stageCreatureName = document.getElementById('stage-creature-name');
 const stageCreatureThai = document.getElementById('stage-creature-thai');
 const stageCreatureDescription = document.getElementById('stage-creature-description');
+const creatureCompanion = document.getElementById('creature-companion');
+const creatureCompanionImg = document.getElementById('creature-companion-img');
+const creatureCompanionName = document.getElementById('creature-companion-name');
+const creatureCompanionStage = document.getElementById('creature-companion-stage');
 
 const gameStages = [
     { number: 1, title: 'Stage 1', label: 'Uppercase Letters', mode: 'uppercase' },
@@ -391,43 +428,48 @@ const gameStages = [
 
 const creatureLines = [
     {
-        line: 'Star Line',
+        line: 'Drako',
         forms: [
-            { english: 'Star Cub', thai: 'ลูกดาวน้อย', description: 'A gentle star friend that glows when learners finish uppercase letters.', image: 'assets/creatures/star-cub.svg' },
-            { english: 'Star Fox', thai: 'จิ้งจอกดาว', description: 'Its bright tail helps guide learners through lowercase letters.', image: 'assets/creatures/star-fox.svg' },
-            { english: 'Star Guardian', thai: 'ผู้พิทักษ์ดวงดาว', description: 'A calm sky protector that celebrates every mixed-letter victory.', image: 'assets/creatures/star-guardian.svg' }
+            { english: 'Drako Hatchling', thai: 'ดราโก้น้อย', description: 'A tiny dragon friend ready for uppercase letters.', image: 'assets/creatures/Drako/01_stage.png' },
+            { english: 'Drako Spark', thai: 'ดราโกประกายไฟ', description: 'Its bright flame grows with lowercase practice.', image: 'assets/creatures/Drako/02_stage.png' },
+            { english: 'Drako Wing', thai: 'ดราโกปีกกล้า', description: 'A confident flyer for mixed-letter challenges.', image: 'assets/creatures/Drako/03_stage.png' },
+            { english: 'Drako Master', thai: 'ดราโกจ้าวฟ้า', description: 'A full evolution that celebrates word sounds.', image: 'assets/creatures/Drako/04_stage.png' }
         ]
     },
     {
-        line: 'Bubble Line',
+        line: 'Gryphore',
         forms: [
-            { english: 'Bubble Hatch', thai: 'ฟองไข่น้อย', description: 'A bubbly beginner that bounces happily after Stage 1.', image: 'assets/creatures/bubble-hatch.svg' },
-            { english: 'Bubble Dino', thai: 'ไดโนฟองสบู่', description: 'A playful dino that carries letter sounds in floating bubbles.', image: 'assets/creatures/bubble-dino.svg' },
-            { english: 'Bubble Dragon', thai: 'มังกรฟองฟ้า', description: 'A friendly dragon that blows rainbow bubbles for clear reading.', image: 'assets/creatures/bubble-dragon.svg' }
+            { english: 'Gryphore Chick', thai: 'กริฟฟอร์น้อย', description: 'A brave first form for the start of the alphabet quest.', image: 'assets/creatures/Gryphore/01_stage.png' },
+            { english: 'Gryphore Scout', thai: 'กริฟฟอร์นักสำรวจ', description: 'A quick learner that listens closely to every sound.', image: 'assets/creatures/Gryphore/02_stage.png' },
+            { english: 'Gryphore Guard', thai: 'กริฟฟอร์ผู้พิทักษ์', description: 'A strong companion for mixed uppercase and lowercase letters.', image: 'assets/creatures/Gryphore/03_stage.png' },
+            { english: 'Gryphore King', thai: 'กริฟฟอร์ราชา', description: 'A majestic final form for the last stage.', image: 'assets/creatures/Gryphore/04_stage.png' }
         ]
     },
     {
-        line: 'Leaf Line',
+        line: 'Nagaris',
         forms: [
-            { english: 'Leaf Sprout', thai: 'ต้นอ่อนใบไม้', description: 'A tiny sprout that grows with each correct letter.', image: 'assets/creatures/leaf-sprout.svg' },
-            { english: 'Leaf Bunny', thai: 'กระต่ายใบไม้', description: 'A quick forest helper that listens carefully to every sound.', image: 'assets/creatures/leaf-bunny.svg' },
-            { english: 'Forest Hero', thai: 'ฮีโร่ป่าใส', description: 'A brave woodland friend that cheers for the full alphabet quest.', image: 'assets/creatures/forest-hero.svg' }
+            { english: 'Nagaris Wisp', thai: 'นาการีสแสงน้อย', description: 'A calm creature that appears when Stage 1 begins.', image: 'assets/creatures/Nagaris/01_stage.png' },
+            { english: 'Nagaris Flow', thai: 'นาการีสสายน้ำ', description: 'Its smooth movement helps with lowercase letters.', image: 'assets/creatures/Nagaris/02_stage.png' },
+            { english: 'Nagaris Crest', thai: 'นาการีสเกล็ดใส', description: 'A focused form for mixed-letter questions.', image: 'assets/creatures/Nagaris/03_stage.png' },
+            { english: 'Nagaris Legend', thai: 'นาการีสตำนาน', description: 'A graceful final evolution for word-sound mastery.', image: 'assets/creatures/Nagaris/04_stage.png' }
         ]
     },
     {
-        line: 'Cloud Line',
+        line: 'Phonica',
         forms: [
-            { english: 'Cloud Kitten', thai: 'ลูกแมวเมฆ', description: 'A soft cloud kitten that naps on successful uppercase practice.', image: 'assets/creatures/cloud-kitten.svg' },
-            { english: 'Cloud Cat', thai: 'แมวเมฆฟู', description: 'A floating cat that purrs along with lowercase sounds.', image: 'assets/creatures/cloud-cat.svg' },
-            { english: 'Sky Spirit', thai: 'ภูตท้องฟ้า', description: 'A bright sky spirit that watches over confident readers.', image: 'assets/creatures/sky-spirit.svg' }
+            { english: 'Phonica Bud', thai: 'โฟนิกาตัวน้อย', description: 'A sound-loving friend for uppercase practice.', image: 'assets/creatures/Phonica/01_stage.png' },
+            { english: 'Phonica Tune', thai: 'โฟนิกาทำนอง', description: 'It hums along while learners hear lowercase letters.', image: 'assets/creatures/Phonica/02_stage.png' },
+            { english: 'Phonica Echo', thai: 'โฟนิกาเสียงก้อง', description: 'A bright form that handles mixed letters clearly.', image: 'assets/creatures/Phonica/03_stage.png' },
+            { english: 'Phonica Star', thai: 'โฟนิกาดาวเสียง', description: 'A final evolution powered by word sounds.', image: 'assets/creatures/Phonica/04_stage.png' }
         ]
     },
     {
-        line: 'Spark Line',
+        line: 'Unica',
         forms: [
-            { english: 'Spark Chick', thai: 'ลูกเจี๊ยบประกาย', description: 'A tiny spark chick that twinkles after the first five answers.', image: 'assets/creatures/spark-chick.svg' },
-            { english: 'Spark Bird', thai: 'นกประกายไฟ', description: 'A cheerful bird that lights up lowercase practice.', image: 'assets/creatures/spark-bird.svg' },
-            { english: 'Thunder Phoenix', thai: 'ฟีนิกซ์สายฟ้า', description: 'A kind thunder phoenix that shines for every alphabet challenge.', image: 'assets/creatures/thunder-phoenix.svg' }
+            { english: 'Unica Foal', thai: 'ยูนิกาน้อย', description: 'A gentle first companion for new letter sounds.', image: 'assets/creatures/Unica/01_stage.png' },
+            { english: 'Unica Gleam', thai: 'ยูนิกาแสงใส', description: 'A shining helper for lowercase questions.', image: 'assets/creatures/Unica/02_stage.png' },
+            { english: 'Unica Bloom', thai: 'ยูนิกาบุปผา', description: 'A magical evolution for mixed-letter practice.', image: 'assets/creatures/Unica/03_stage.png' },
+            { english: 'Unica Aurora', thai: 'ยูนิกาออโรรา', description: 'A brilliant final form for the complete alphabet journey.', image: 'assets/creatures/Unica/04_stage.png' }
         ]
     }
 ];
@@ -446,6 +488,68 @@ function speakText(text) {
     utterance.pitch = 1.2; // Slightly higher pitch for cute feel
     
     synth.speak(utterance);
+}
+
+function playToneSequence(notes) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    const audioContext = new AudioContext();
+    const masterGain = audioContext.createGain();
+    masterGain.gain.setValueAtTime(0.18, audioContext.currentTime);
+    masterGain.connect(audioContext.destination);
+
+    notes.forEach(note => {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        const startTime = audioContext.currentTime + note.delay;
+        const endTime = startTime + note.duration;
+
+        oscillator.type = note.type || 'sine';
+        oscillator.frequency.setValueAtTime(note.frequency, startTime);
+        gain.gain.setValueAtTime(0.001, startTime);
+        gain.gain.exponentialRampToValueAtTime(note.volume || 0.5, startTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+
+        oscillator.connect(gain);
+        gain.connect(masterGain);
+        oscillator.start(startTime);
+        oscillator.stop(endTime + 0.03);
+    });
+
+    setTimeout(() => audioContext.close(), 1600);
+}
+
+function playCorrectSound() {
+    playToneSequence([
+        { frequency: 660, delay: 0, duration: 0.08, volume: 0.25 },
+        { frequency: 880, delay: 0.08, duration: 0.12, volume: 0.3 }
+    ]);
+}
+
+function playTryAgainSound() {
+    playToneSequence([
+        { frequency: 330, delay: 0, duration: 0.12, volume: 0.2, type: 'triangle' },
+        { frequency: 294, delay: 0.12, duration: 0.14, volume: 0.18, type: 'triangle' }
+    ]);
+}
+
+function playStageClearSound(stageNumber) {
+    const baseNotes = [
+        [523, 659, 784, 1046],
+        [587, 740, 880, 1175],
+        [659, 784, 988, 1319],
+        [784, 988, 1175, 1568]
+    ];
+    const notes = baseNotes[Math.min(stageNumber - 1, baseNotes.length - 1)].map((frequency, index) => ({
+        frequency: frequency,
+        delay: index * 0.12,
+        duration: 0.22,
+        volume: 0.35,
+        type: index === 3 ? 'square' : 'sine'
+    }));
+
+    playToneSequence(notes);
 }
 
 function replaySound() {
@@ -535,7 +639,7 @@ function generateGameLevels() {
 
 function selectCreatureLine() {
     selectedCreatureLine = creatureLines[Math.floor(Math.random() * creatureLines.length)];
-    updateVrCreatureDisplay(null);
+    updateCreatureDisplay(1);
 }
 
 function startGame() {
@@ -546,6 +650,8 @@ function startGame() {
     gameState.score = 0;
     gameState.isPlaying = true;
     stageClearModal.classList.add('hidden', 'opacity-0');
+    creatureCompanion.classList.remove('hidden');
+    requestAnimationFrame(() => creatureCompanion.classList.remove('opacity-0'));
     document.getElementById('next-btn').classList.add('hidden'); // Hide next button on game start/reset
     updateScoreUI();
     switchScreen('game');
@@ -578,6 +684,7 @@ function loadLevel(index) {
     gameState.currentLevel = index;
     gameState.waitingForNext = false;
     const level = activeLevels[index];
+    updateCreatureDisplay(level.stage);
     
     levelDisplay.innerText = index + 1;
     stageDisplay.innerText = `${level.stageTitle}: ${level.stageLabel}`;
@@ -618,15 +725,16 @@ function loadLevel(index) {
 
 function checkAnswer(selectedLetter) {
     if (gameState.waitingForNext) return;
-    gameState.waitingForNext = true;
 
     const level = activeLevels[gameState.currentLevel];
     const cards = document.querySelectorAll('#cards-container .ar-clickable');
     
     if (selectedLetter === level.correct) {
+        gameState.waitingForNext = true;
         // Correct
         gameState.score = Math.min(gameState.score + POINTS_PER_CORRECT, MAX_SCORE);
         updateScoreUI();
+        playCorrectSound();
         speakText("Correct!");
         showFeedback("Correct! 🎉", "text-green-500");
         
@@ -662,6 +770,8 @@ function checkAnswer(selectedLetter) {
 
     } else {
         // Wrong
+        gameState.waitingForNext = true;
+        playTryAgainSound();
         speakText("Try again");
         showFeedback("Try Again 😊", "text-orange-500");
         
@@ -673,13 +783,11 @@ function checkAnswer(selectedLetter) {
             }
         });
 
-        // Restart entire game if wrong after a short duration
+        // Keep the same question active so accidental taps or pinches do not reset the run.
         setTimeout(() => {
             gameState.waitingForNext = false;
             hideFeedback();
-            document.getElementById('next-btn').classList.add('hidden'); // Hide button
-            startGame(); // Reset to level 1 and score 0
-        }, 1500);
+        }, 900);
     }
 }
 
@@ -715,10 +823,12 @@ function showStageClearModal(stageNumber) {
     stageCreatureName.innerText = creature.english;
     stageCreatureThai.innerText = creature.thai;
     stageCreatureDescription.innerText = creature.description;
+    updateCreatureDisplay(stageNumber);
     updateVrCreatureDisplay(creature);
 
     stageClearModal.classList.remove('hidden');
     requestAnimationFrame(() => stageClearModal.classList.remove('opacity-0'));
+    playStageClearSound(stageNumber);
     speakText(stageNumber === TOTAL_STAGES ? 'Alphabet master!' : `Stage ${stageNumber} clear!`);
 }
 
@@ -779,6 +889,17 @@ function updateVrCreatureDisplay(creature) {
 
     // Placeholder integration point: this project does not currently load A-Frame, Three.js, or WebXR.
     window.currentVrCreature = creature;
+}
+
+function updateCreatureDisplay(stageNumber) {
+    if (!selectedCreatureLine) return;
+
+    const formIndex = Math.min(Math.max(stageNumber, 1) - 1, selectedCreatureLine.forms.length - 1);
+    const creature = selectedCreatureLine.forms[formIndex];
+    creatureCompanionImg.src = creature.image;
+    creatureCompanionImg.alt = creature.english;
+    creatureCompanionName.innerText = creature.english;
+    creatureCompanionStage.innerText = `Stage ${stageNumber} Evolution`;
 }
 
 function playNukeEffect() {
