@@ -440,6 +440,22 @@ const MAX_SCORE = TOTAL_QUESTIONS * POINTS_PER_CORRECT;
 const PINCH_THRESHOLD = 0.05; // Distance threshold for pinching
 let synth = window.speechSynthesis;
 
+const SOUND_EFFECTS = {
+    select: 'assets/sounds/select-click.wav',
+    correct: 'assets/sounds/correct-win.wav',
+    wrong: 'assets/sounds/wrong-answer.wav',
+    stageClear: 'assets/sounds/stage-clear-bell.wav',
+    finalClear: 'assets/sounds/final-clear.wav'
+};
+const soundPlayers = Object.fromEntries(
+    Object.entries(SOUND_EFFECTS).map(([name, src]) => {
+        const audio = new Audio(src);
+        audio.preload = 'auto';
+        audio.volume = 0.55;
+        return [name, audio];
+    })
+);
+
 // DOM Elements
 const screens = {
     splash: document.getElementById('screen-splash'),
@@ -568,40 +584,56 @@ function playToneSequence(notes) {
     setTimeout(() => audioContext.close(), 1600);
 }
 
+function playSoundEffect(name, fallback) {
+    const audio = soundPlayers[name];
+    if (!audio) {
+        if (fallback) fallback();
+        return;
+    }
+
+    audio.currentTime = 0;
+    audio.play().catch(() => {
+        if (fallback) fallback();
+    });
+}
+
 function playCorrectSound() {
-    playToneSequence([
+    playSoundEffect('correct', () => playToneSequence([
         { frequency: 660, delay: 0, duration: 0.08, volume: 0.25 },
         { frequency: 880, delay: 0.08, duration: 0.12, volume: 0.3 }
-    ]);
+    ]));
 }
 
 function playTryAgainSound() {
-    playToneSequence([
+    playSoundEffect('wrong', () => playToneSequence([
         { frequency: 330, delay: 0, duration: 0.12, volume: 0.2, type: 'triangle' },
         { frequency: 294, delay: 0.12, duration: 0.14, volume: 0.18, type: 'triangle' }
-    ]);
+    ]));
 }
 
 function playStageClearSound(stageNumber) {
-    const baseNotes = [
-        [523, 659, 784, 1046],
-        [587, 740, 880, 1175],
-        [659, 784, 988, 1319],
-        [784, 988, 1175, 1568]
-    ];
-    const notes = baseNotes[Math.min(stageNumber - 1, baseNotes.length - 1)].map((frequency, index) => ({
-        frequency: frequency,
-        delay: index * 0.12,
-        duration: 0.22,
-        volume: 0.35,
-        type: index === 3 ? 'square' : 'sine'
-    }));
+    playSoundEffect(stageNumber === TOTAL_STAGES ? 'finalClear' : 'stageClear', () => {
+        const baseNotes = [
+            [523, 659, 784, 1046],
+            [587, 740, 880, 1175],
+            [659, 784, 988, 1319],
+            [784, 988, 1175, 1568]
+        ];
+        const notes = baseNotes[Math.min(stageNumber - 1, baseNotes.length - 1)].map((frequency, index) => ({
+            frequency: frequency,
+            delay: index * 0.12,
+            duration: 0.22,
+            volume: 0.35,
+            type: index === 3 ? 'square' : 'sine'
+        }));
 
-    playToneSequence(notes);
+        playToneSequence(notes);
+    });
 }
 
 function replaySound() {
     if (gameState.currentScreen === 'game' && !gameState.waitingForNext) {
+        playSoundEffect('select');
         speakText(activeLevels[gameState.currentLevel].sound);
     }
 }
@@ -628,6 +660,7 @@ function switchScreen(screenName) {
 }
 
 function goToInstruction() {
+    playSoundEffect('select');
     speakText(""); // Unlock TTS on browser interaction
     switchScreen('instruction');
 }
@@ -709,6 +742,7 @@ function setCreatureImage(imageElement, frameElement, src, alt) {
 }
 
 function startGame() {
+    playSoundEffect('select');
     generateGameLevels(); // Create dynamic randomized set of 20 staged levels
     selectCreatureLine(); // Reset reward creature for every new run
     pendingStageClear = null;
@@ -792,6 +826,7 @@ function loadLevel(index) {
 function checkAnswer(selectedLetter) {
     if (gameState.waitingForNext) return;
 
+    playSoundEffect('select');
     const level = activeLevels[gameState.currentLevel];
     const cards = document.querySelectorAll('#cards-container .ar-clickable');
     
@@ -863,6 +898,7 @@ function isStageComplete(levelIndex) {
 }
 
 function proceedAfterCorrect() {
+    playSoundEffect('select');
     document.getElementById('next-btn').classList.add('hidden');
     hideFeedback();
 
@@ -901,6 +937,7 @@ function showStageClearModal(stageNumber) {
 }
 
 function continueAfterStageClear() {
+    playSoundEffect('select');
     stageClearModal.classList.add('opacity-0');
     setTimeout(() => stageClearModal.classList.add('hidden'), 500);
 
