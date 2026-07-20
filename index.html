@@ -429,7 +429,9 @@ let gameState = {
     currentLevel: 0,
     score: 0,
     isPlaying: false,
-    waitingForNext: false
+    waitingForNext: false,
+    choicesReady: false,
+    roundToken: 0
 };
 
 const QUESTIONS_PER_STAGE = 5;
@@ -438,6 +440,7 @@ const TOTAL_QUESTIONS = QUESTIONS_PER_STAGE * TOTAL_STAGES;
 const POINTS_PER_CORRECT = 100;
 const MAX_SCORE = TOTAL_QUESTIONS * POINTS_PER_CORRECT;
 const PINCH_THRESHOLD = 0.05; // Distance threshold for pinching
+const CHOICE_REVEAL_DELAY_MS = 1800; // Let students hear the prompt before choices can be selected
 let synth = window.speechSynthesis;
 
 const SOUND_EFFECTS = {
@@ -783,6 +786,9 @@ function loadLevel(index) {
 
     gameState.currentLevel = index;
     gameState.waitingForNext = false;
+    gameState.choicesReady = false;
+    gameState.roundToken += 1;
+    const roundToken = gameState.roundToken;
     const level = activeLevels[index];
     updateCreatureDisplay(level.stage);
     
@@ -790,13 +796,17 @@ function loadLevel(index) {
     stageDisplay.innerText = `${level.stageTitle}: ${level.stageLabel}`;
     updateScoreUI();
     
-    // Clear previous cards
-    cardsContainer.innerHTML = '';
+    // Keep choices out of the page until the listening period finishes.
+    cardsContainer.innerHTML = `
+        <div class="col-span-3 glass rounded-2xl px-6 py-5 text-center text-xl md:text-3xl font-bold text-purple-600 animate-pulse">
+            🔊 ตั้งใจฟังก่อนนะ...
+        </div>
+    `;
     
     // Shuffle choices visually but keep mapping to original master alphabet data for accurate lookup
     let shuffledChoices = shuffleArray([...level.choices]);
 
-    shuffledChoices.forEach((choice, idx) => {
+    const cardMarkup = shuffledChoices.map((choice, idx) => {
         let cardData = masterAlphabetPool.find(p => p.letter === choice.toUpperCase());
         
         let wordText = cardData ? cardData.word : "Word";
@@ -804,7 +814,7 @@ function loadLevel(index) {
 
         const delay = idx * 0.15; // Staggered entrance animation
 
-        const cardHTML = `
+        return `
             <div onclick="checkAnswer('${choice}')" 
                  class="ar-clickable glass-card rounded-2xl p-4 md:p-6 flex flex-col items-center justify-center cursor-pointer animate-bounce-in max-w-[200px] mx-auto w-full"
                  style="animation-delay: ${delay}s;"
@@ -814,17 +824,23 @@ function loadLevel(index) {
                 <div class="text-lg md:text-xl font-bold text-gray-700 english-font">${wordText}</div>
             </div>
         `;
-        cardsContainer.innerHTML += cardHTML;
-    });
+    }).join('');
 
-    // Speak the target letter after cards appear
+    // Play the prompt first, then reveal and unlock the answer cards.
     setTimeout(() => {
+        if (roundToken !== gameState.roundToken || gameState.currentScreen !== 'game') return;
         speakText(level.soundPrompt);
-    }, 800);
+    }, 250);
+
+    setTimeout(() => {
+        if (roundToken !== gameState.roundToken || gameState.currentScreen !== 'game') return;
+        cardsContainer.innerHTML = cardMarkup;
+        gameState.choicesReady = true;
+    }, CHOICE_REVEAL_DELAY_MS);
 }
 
 function checkAnswer(selectedLetter) {
-    if (gameState.waitingForNext) return;
+    if (gameState.waitingForNext || !gameState.choicesReady) return;
 
     playSoundEffect('select');
     const level = activeLevels[gameState.currentLevel];
